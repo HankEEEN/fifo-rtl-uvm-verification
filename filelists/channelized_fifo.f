@@ -1,0 +1,7 @@
+channelized_fifo_gray_sync.sv
+channelized_fifo_event_sync.sv
+channelized_fifo_pointer.sv
+channelized_fifo_memory.sv
+channelized_fifo_core.sv
+channelized_fifo.sv
+tb/channelized_fifo_smoke_tb.sv
