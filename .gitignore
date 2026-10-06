@@ -1,0 +1,14 @@
+# Questa/ModelSim output
+work/
+transcript
+modelsim.ini
+*.wlf
+*.log
+*.ucdb
+*.vcd
+
+# Verilator output
+obj_dir/
+
+# Editor-local settings
+.vscode/
