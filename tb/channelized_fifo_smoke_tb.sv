@@ -63,6 +63,8 @@ module channelized_fifo_smoke_tb;
     logic ll_rinc;
     logic ll_winc;
     logic ll_write;
+    logic ll_clear_chan_wr;
+    logic ll_clear_chan_rd;
     logic [DATA_W-1:0] ll_din;
     wire [DATA_W-1:0] ll_dout;
     wire ll_empty;
@@ -79,7 +81,7 @@ module channelized_fifo_smoke_tb;
         .clk_wr(clk), .clk_rd(clk),
         .rst_wr_an(ll_rst_an), .rst_rd_an(ll_rst_an),
         .clear_wr(1'b0), .clear_rd(1'b0),
-        .clear_chan_wr(1'b0), .clear_chan_rd(1'b0),
+        .clear_chan_wr(ll_clear_chan_wr), .clear_chan_rd(ll_clear_chan_rd),
         .rinc(ll_rinc), .winc(ll_winc),
         .block_rinc(1'b0), .block_winc(1'b0),
         .write(ll_write), .din(ll_din), .dout(ll_dout),
@@ -260,6 +262,8 @@ module channelized_fifo_smoke_tb;
         ll_rinc = 1'b0;
         ll_winc = 1'b0;
         ll_write = 1'b0;
+        ll_clear_chan_wr = 1'b0;
+        ll_clear_chan_rd = 1'b0;
         ll_din = '0;
 
         one_rst_an = 1'b0;
@@ -416,6 +420,30 @@ module channelized_fifo_smoke_tb;
         @(negedge clk);
         ll_write = 1'b0;
         ll_winc = 1'b0;
+        ll_rinc = 1'b0;
+
+        // Channel storage clear has priority over write-through when an empty
+        // low-latency FIFO receives a write and pointer advance together.
+        @(negedge clk);
+        ll_rinc = 1'b1;
+        @(posedge clk);
+        @(negedge clk);
+        ll_rinc = 1'b0;
+        ll_din = 8'hE8;
+        ll_write = 1'b1;
+        ll_winc = 1'b1;
+        ll_clear_chan_wr = 1'b1;
+        @(posedge clk);
+        #1;
+        if ((ll_dout !== 8'h00) || ll_empty || (ll_how_full != 1))
+            $fatal(1, "low-latency channel-clear priority failed");
+        @(negedge clk);
+        ll_write = 1'b0;
+        ll_winc = 1'b0;
+        ll_clear_chan_wr = 1'b0;
+        ll_rinc = 1'b1;
+        @(posedge clk);
+        @(negedge clk);
         ll_rinc = 1'b0;
 
         // Depth-one fill, overflow protection, and drain.

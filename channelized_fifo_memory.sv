@@ -59,7 +59,9 @@ module channelized_fifo_memory #(
                 if (clear_rd[rd_chan_index]) begin
                     dout[rd_chan_index*DATA_W +: DATA_W] <= MEM_RST_VAL;
                 end else if (read) begin
-                    if (LOW_LATENCY &&
+                    if (LOW_LATENCY && clear_wr[rd_chan_index])
+                        dout[rd_chan_index*DATA_W +: DATA_W] <= MEM_RST_VAL;
+                    else if (LOW_LATENCY &&
                         write[rd_chan_index] && (wptr == rptr))
                         dout[rd_chan_index*DATA_W +: DATA_W] <=
                             din[rd_chan_index*DATA_W +: DATA_W];

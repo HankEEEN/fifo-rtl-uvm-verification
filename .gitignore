@@ -1,5 +1,7 @@
 # Questa/ModelSim output
 work/
+uvm_work_*/
+logs/
 transcript
 modelsim.ini
 *.wlf

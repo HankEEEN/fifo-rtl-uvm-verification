@@ -61,11 +61,14 @@ Likewise, one `rinc` consumes the complete multi-channel entry.
 - Assert `rst_wr_an` and `rst_rd_an` together. Their asynchronous assertion and
   deassertion must be safe for their respective local clock domains. Resetting
   only one side is outside the supported data-preservation contract.
-- Assert `clear_wr` and `clear_rd` together, and hold each through at least one
-  active edge of its clock, when flushing the FIFO.  This resets both local
-  pointers and their synchronized remote views.  Independent pointer clears
-  are exposed for compatibility, but clearing only one domain can make the two
-  domains disagree about occupancy.
+- Assert `clear_wr` and `clear_rd` together when flushing the FIFO.  In
+  asynchronous mode their assertion windows must overlap long enough that
+  each domain observes the other pointer at its cleared value; the supplied
+  UVM test holds both for four local active edges.  This resets both local
+  pointers and their synchronized remote views.  Independent or isolated
+  one-cycle pointer clears are exposed for compatibility, but are not a safe
+  asynchronous flush because the domains can temporarily disagree about
+  occupancy.
 - `clear_chan_wr[n]` clears channel `n` in every storage entry;
   `clear_chan_rd[n]` clears channel `n` in the registered read output.
 - An asynchronous underflow is delivered as a write-clock pulse through a
@@ -112,8 +115,12 @@ FIFO/
 |-- channelized_fifo_event_sync.sv      Event-handshake synchronizer
 |-- filelists/channelized_fifo_rtl.f    Synthesizable RTL source list
 |-- filelists/channelized_fifo.f        RTL and smoke-test source list
-|-- scripts/run_questa.sh               Git Bash regression command
-`-- tb/channelized_fifo_smoke_tb.sv     Self-checking regression
+|-- filelists/channelized_fifo_uvm.f    RTL and UVM source list
+|-- docs/UVM_TEST_PLAN.md               Deterministic verification plan
+|-- scripts/run_questa.sh               Git Bash smoke-test command
+|-- scripts/run_uvm_questa.sh           Git Bash UVM matrix command
+|-- tb/channelized_fifo_smoke_tb.sv     Self-checking smoke regression
+`-- tb/uvm/                             UVM agents, model, tests, and assertions
 ```
 
 All RTL and testbench sources use the `.sv` extension because they contain
@@ -121,7 +128,7 @@ SystemVerilog constructs such as `logic`, `always_comb`, `always_ff`, typed
 parameters, variable part-selects, and assertions.  The build still passes
 `-sv` explicitly so the selected language is unambiguous across tools.
 
-## Running the regression
+## Running the smoke test
 
 From Git Bash in the repository root:
 
@@ -158,6 +165,51 @@ The expected completion message is:
 Channelized FIFO smoke test PASSED
 ```
 
+## Running the UVM regression
+
+The UVM regression is the thorough verification suite.  It uses deterministic
+directed algorithms rather than constrained randomization, so it is compatible
+with Questa Starter.  It includes independent write/read UVM agents, a
+cycle-accurate physical-memory and FIFO reference model, fatal interface
+assertions, boundary/error tests, repeated pointer wraparound, low-latency
+tests, and CDC tests with both write-fast/read-slow and write-slow/read-fast
+clock ratios.
+
+From Git Bash in the repository root:
+
+```bash
+bash scripts/run_uvm_questa.sh
+```
+
+The script uses Questa's precompiled `mtiUvm` UVM 1.1d library and defaults to
+this Quartus Lite installation path:
+
+```text
+D:/quartus_24.1_lite/questa_fse/verilog_src/uvm-1.1d/src
+```
+
+If Questa is installed elsewhere, override the source location for the macro
+include before running the script:
+
+```bash
+UVM_SRC="D:/path/to/questa/verilog_src/uvm-1.1d/src" \
+  bash scripts/run_uvm_questa.sh
+```
+
+The script recompiles and runs six configurations: normal synchronous,
+low-latency synchronous, asynchronous depth 12, asynchronous depth 8 with the
+opposite clock ratio, depth one, and a three-channel parameter variation with
+nonzero memory/pointer reset values.  Per-case logs are written under `logs/`.
+It stops on the first compile, assertion, UVM, or missing-pass-marker failure.
+Successful completion ends with:
+
+```text
+FIFO UVM regression PASSED
+```
+
+The complete scenario matrix and pass criteria are in
+[`docs/UVM_TEST_PLAN.md`](docs/UVM_TEST_PLAN.md).
+
 Optional lint command (run from an environment where Verilator is configured):
 
 ```bash
@@ -181,8 +233,8 @@ not production sign-off.  A target project still needs:
   bus skew to one source-clock period;
 - reset-domain analysis proving that assertion is coordinated and that each
   reset is released safely in its local clock domain;
-- randomized/reference-model verification and formal full/empty proofs across
-  the supported parameter matrix;
+- additional coverage closure and formal full/empty proofs across the complete
+  product-specific parameter matrix;
 - synthesis, RAM-inference, timing, and power checks for the target FPGA/ASIC;
 - a decision about whether clearing every memory word is acceptable, because
   whole-array reset and per-channel clearing can prevent block-RAM inference;
